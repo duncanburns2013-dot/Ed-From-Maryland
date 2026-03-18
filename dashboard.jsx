@@ -1,0 +1,411 @@
+import { useState, useEffect } from "react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Area, ComposedChart } from "recharts";
+
+const mcTax=[
+  {y:"1999",a:254600,t:7334,o:1},{y:"2000",a:256210,t:7372,o:1},{y:"2001",a:644560,t:7400,o:1},
+  {y:"2002",a:689503,t:7902,o:0},{y:"2003",a:734446,t:8767,o:0},{y:"2004",a:779390,t:9229,o:0},
+  {y:"2005",a:906780,t:10321,o:0},{y:"2006",a:1034170,t:10994,o:0},{y:"2007",a:1161560,t:12311,o:0},
+  {y:"2008",a:1215036,t:12883,o:0},{y:"2009",a:1268512,t:13465,o:0},{y:"2010",a:1321990,t:13999,o:0},
+  {y:"2011",a:1027400,t:11447,o:0},{y:"2012",a:1027400,t:11917,o:0},{y:"2013",a:1027400,t:12098,o:0},
+  {y:"2014",a:1070667,t:12449,o:0},{y:"2015",a:1113933,t:12835,o:0},{y:"2016",a:1157200,t:13778,o:0},
+  {y:"2017",a:1191933,t:13885,o:0},{y:"2018",a:1226667,t:14040,o:0},{y:"2019",a:1261400,t:14430,o:0},
+  {y:"2020",a:1155200,t:13298,o:0},{y:"2021",a:1155200,t:13328,o:0},{y:"2022",a:1155200,t:13401,o:0},
+  {y:"2023",a:1321667,t:15931,o:0},{y:"2024",a:1488133,t:17862,o:0},{y:"2025",a:1654600,t:19866,o:0}
+];
+const maOld=[0,97500,133800,133800,220600,240600,267600,274600,268500,249700,228300,209700,204800,204800,210400,224800,247000,273700,287300,322300,351400,371400,398400,425500,450000,492200];
+const combo=mcTax.map((m,i)=>({y:m.y,md:m.a,ma:maOld[Math.min(i,maOld.length-1)]}));
+const stD=[{s:"MA",v:23.9},{s:"DC",v:8.5},{s:"CA",v:4.2},{s:"NY",v:3.1},{s:"MD",v:1.9},{s:"VA",v:1.8}];
+const totalTax=mcTax.reduce((s,d)=>s+d.t,0);
+const TABS=["THE RECORDS","3 PROPERTIES","MC TAX BILLS","MORTGAGE DOC","FEC DATA","DISCLOSURES","TIMELINE"];
+const RED="#ff2d55",BLUE="#1e90ff",GREEN="#00e676",PURPLE="#b266ff",GOLD="#ffd740",CYAN="#18ffff";
+const BG="#0b1121",CARD="#0f1a2e",BORDER="#1a2a4a",TXT="#d0daf0",DTXT="#8899bb",LTXT="#e8eeff";
+
+const Tip=({active,payload,label})=>{
+  if(!active||!payload?.length)return null;
+  return <div style={{background:CARD,border:"1px solid "+BLUE,padding:"10px 14px",fontSize:12,fontFamily:"monospace",boxShadow:"0 0 20px rgba(30,144,255,0.25)"}}>
+    <div style={{color:GOLD,fontWeight:700,marginBottom:4,letterSpacing:2}}>{label}</div>
+    {payload.map((p,i)=><div key={i} style={{color:TXT}}>{p.name}: ${typeof p.value==="number"?p.value.toLocaleString():p.value}</div>)}
+  </div>;
+};
+
+const css=`
+  @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Courier+Prime:wght@400;700&family=Barlow+Condensed:wght@400;500;600;700&display=swap');
+  @keyframes fadeIn{0%{opacity:0;transform:translateY(16px)}100%{opacity:1;transform:translateY(0)}}
+  .fade{animation:fadeIn 0.5s ease both}
+  .tb{position:relative;overflow:hidden;transition:all 0.3s}
+  .tb:hover{background:rgba(30,144,255,0.1)!important}
+  .tb::after{content:'';position:absolute;bottom:0;left:0;width:0;height:2px;background:#1e90ff;transition:width 0.3s}
+  .tb:hover::after,.tb.on::after{width:100%}
+  .ec{position:relative;overflow:hidden;transition:transform 0.3s,box-shadow 0.3s}
+  .ec:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(30,144,255,0.1)}
+  .rh{transition:background 0.15s}
+  .rh:hover{background:rgba(30,144,255,0.06)!important}
+`;
+
+export default function App(){
+  const[tab,setTab]=useState(0);
+  const[ok,setOk]=useState(false);
+  useEffect(()=>{setTimeout(()=>setOk(true),150)},[]);
+
+  const S=({l,v,sub,c=CYAN,w})=>(
+    <div className="ec" style={{background:CARD,border:"1px solid "+BORDER,padding:w?"10px":"16px 14px"}}>
+      <div style={{fontSize:8,color:DTXT,letterSpacing:3,fontFamily:"'Courier Prime'"}}>{l}</div>
+      <div style={{fontSize:w?20:26,fontWeight:700,color:c,fontFamily:"'Oswald'",marginTop:3}}>{v}</div>
+      {sub&&<div style={{fontSize:9,color:DTXT,marginTop:2,fontFamily:"'Courier Prime'"}}>{sub}</div>}
+    </div>
+  );
+  const F=({c=BLUE,children})=><span style={{background:c+"15",color:c,fontSize:8,fontWeight:700,padding:"2px 7px",letterSpacing:1,border:"1px solid "+c+"30",fontFamily:"'Courier Prime'"}}>{children}</span>;
+  const Sec=({t,f,children})=><div style={{marginBottom:22}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>{f&&<F c={f[1]||BLUE}>{f[0]}</F>}<div style={{fontSize:11,fontWeight:700,color:LTXT,letterSpacing:3,fontFamily:"'Courier Prime'"}}>{t}</div></div>{children}</div>;
+  const Card=({t,a=BLUE,children})=><div className="ec" style={{background:CARD,border:"1px solid "+BORDER,padding:16,marginBottom:8,borderLeft:"3px solid "+a}}>{t&&<div style={{fontSize:10,fontWeight:700,color:a,letterSpacing:2,marginBottom:8,fontFamily:"'Courier Prime'"}}>{t}</div>}<div style={{fontSize:12.5,lineHeight:1.75,color:TXT}}>{children}</div></div>;
+
+  return(
+    <div style={{background:"radial-gradient(ellipse at 15% 50%,rgba(30,144,255,0.06),transparent 50%),radial-gradient(ellipse at 85% 20%,rgba(178,102,255,0.04),transparent 40%),"+BG,color:TXT,minHeight:"100vh",fontFamily:"'Barlow Condensed',sans-serif"}}>
+      <style>{css}</style>
+      <div style={{maxWidth:960,margin:"0 auto",padding:"20px 16px"}}>
+
+        {/* HEADER */}
+        <div className={ok?"fade":""} style={{marginBottom:22,opacity:ok?1:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:6}}>
+            <div style={{width:4,height:44,background:"linear-gradient(180deg,"+RED+","+PURPLE+")"}}/>
+            <div>
+              <div style={{fontSize:10,color:DTXT,fontWeight:700,letterSpacing:4,fontFamily:"'Courier Prime'"}}>PUBLIC RECORDS COMPILATION</div>
+              <div style={{fontSize:10,color:DTXT,fontFamily:"'Courier Prime'",marginTop:2}}>ALL DATA FROM GOVERNMENT RECORDS, SWORN DISCLOSURES, AND RECORDED DOCUMENTS</div>
+            </div>
+          </div>
+          <h1 style={{fontSize:54,fontWeight:700,color:LTXT,margin:"6px 0 0",letterSpacing:"-1px",fontFamily:"'Oswald'",lineHeight:0.95}}>ED FROM <span style={{color:RED,textShadow:"0 0 40px rgba(255,45,85,0.3)"}}>MARYLAND</span></h1>
+          <div style={{height:2,background:"linear-gradient(90deg,"+RED+","+PURPLE+" 50%,transparent)",marginTop:8,marginBottom:6}}/>
+          <div style={{fontSize:12,color:DTXT,fontFamily:"'Courier Prime'",letterSpacing:1}}>SEN. EDWARD J. MARKEY (D-MA) — PUBLIC RECORDS FROM MA, MD, AND FEDERAL SOURCES</div>
+        </div>
+
+        {/* TABS */}
+        <div style={{display:"flex",gap:0,marginBottom:22,borderBottom:"1px solid "+BORDER,flexWrap:"wrap"}}>
+          {TABS.map((t,i)=><button key={i} onClick={()=>setTab(i)} className={"tb "+(tab===i?"on":"")} style={{background:tab===i?BLUE+"12":"transparent",color:tab===i?CYAN:DTXT,border:"none",borderBottom:tab===i?"2px solid "+BLUE:"2px solid transparent",padding:"9px 13px",fontSize:10.5,fontWeight:600,cursor:"pointer",fontFamily:"'Oswald'",letterSpacing:2}}>{t}</button>)}
+        </div>
+
+{/* ===== THE RECORDS ===== */}
+{tab===0&&<div className="fade">
+  <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8,marginBottom:24}}>
+    <S l="CHEVY CHASE MD" v="$1.94M" sub="4,316 SF • 6 BATH" c={RED} w/>
+    <S l="360 CHARLES MA" v="$683K" sub="1,867 SF • 2.5 BATH" c={GOLD} w/>
+    <S l="7 TOWNSEND MA" v="$492K" sub="1,135 SF • 1 BATH" c={PURPLE} w/>
+    <S l="TOTAL PROPERTY" v="$2.82M" sub="3 PROPERTIES • 2 STATES" c={CYAN} w/>
+    <S l="MC TAXES PAID" v={"$"+Math.round(totalTax/1000)+"K"} sub="27 YRS • 'NOT PRINCIPAL'" c={GREEN} w/>
+  </div>
+
+  <Sec t="WHAT THE RECORDS SHOW" f={["OFFICIAL DOCUMENTS",BLUE]}>
+    <Card t="MONTGOMERY COUNTY MD — TAX BILLS (27 YEARS)" a={RED}>
+      <div style={{fontFamily:"'Courier Prime'",fontSize:12,lineHeight:2}}>
+        3403 Rolling Ct, Chevy Chase MD 20815 — Owner: MARKEY EDWARD J & SUSAN J BLUMENTHAL<br/>
+        <span style={{color:GREEN}}>1999–2001</span>: Occupancy field reads <span style={{color:GREEN,fontWeight:700}}>"PRINCIPAL RESIDENCE"</span><br/>
+        <span style={{color:RED}}>2002–2025</span>: Occupancy field reads <span style={{color:RED,fontWeight:700}}>"NOT A PRINCIPAL RESIDENCE"</span> — 24 consecutive years<br/>
+        SDAT record: Principal Residence: <span style={{color:RED}}>NO</span> • Homestead Application: <span style={{color:RED}}>NO APPLICATION</span><br/>
+        Current assessment: <span style={{color:GOLD}}>$1,654,600 → $1,940,800</span> • Built 1937 • 3,412 SF + 904 SF basement • Brick • 6 bath
+      </div>
+    </Card>
+    <Card t="MALDEN MA — ASSESSOR RECORDS (2 PROPERTIES)" a={GOLD}>
+      <div style={{fontFamily:"'Courier Prime'",fontSize:12,lineHeight:2}}>
+        <span style={{color:GOLD}}>360A Charles St</span> — Condo townhouse — Bought 2/26/2021 for $675,000 from Hennigan, Bryan E<br/>
+        1,867 SF • Built 2007 • 2.5 bath • 100% AC • Basement garage • Assessed: $683,400<br/><br/>
+        <span style={{color:PURPLE}}>7 Townsend St</span> — Old style house — Bought 4/19/2001 for $150,000 from Markey John E (father)<br/>
+        1,135 SF • Built 1900 • 1 bath • No AC • No garage • Oil heat • Assessed: $492,200<br/>
+        Serves as mailing address for both Charles St property and Chevy Chase property
+      </div>
+    </Card>
+    <Card t="MA SECRETARY OF STATE — VOTER REGISTRATION" a={GREEN}>
+      <div style={{fontFamily:"'Courier Prime'",fontSize:12,lineHeight:2}}>
+        Name: EDWARD J MARKEY • Status: <span style={{color:GREEN,fontWeight:700}}>ACTIVE</span> • DOB: 7/11/1946 • Party: DEMOCRAT<br/>
+        Legal Voting Address: <span style={{color:GREEN,fontWeight:700}}>360 CHARLES ST 2, MALDEN, MA 02148</span><br/>
+        Ward 2 • Precinct 2 • Facility: Irish American, Main Hall, 177 West Street<br/>
+        <span style={{color:DTXT}}>Retrieved: March 18, 2026 4:31 AM from sec.state.ma.us</span>
+      </div>
+    </Card>
+    <Card t="MIDDLESEX SOUTH REGISTRY OF DEEDS — MORTGAGE (BK 77078 PG 323)" a={CYAN}>
+      <div style={{fontFamily:"'Courier Prime'",fontSize:12,lineHeight:2}}>
+        Document #43789 • Recorded February 26, 2021 at 2:25:59 PM • 23 pages<br/>
+        Borrowers: <span style={{color:LTXT}}>Susan J Blumenthal and Edward J Markey, Husband and Wife</span><br/>
+        Property: 360 Charles Street, Unit 2, Malden MA 02148<br/>
+        Loan: <span style={{color:GOLD}}>$540,000</span> • Maturity: March 1, 2051 • Lender: Members Mortgage Company, Stoneham MA<br/>
+        Fannie Mae/Freddie Mac Uniform Instrument Form 3022<br/>
+        Riders checked: <span style={{color:GREEN}}>Condominium Rider</span> • Second Home Rider: <span style={{color:DTXT}}>NOT checked</span><br/>
+        Section 6: <span style={{color:CYAN}}>"Borrower shall occupy, establish, and use the Property as Borrower's principal residence within 60 days"</span>
+      </div>
+    </Card>
+    <Card t="SENATE FINANCIAL DISCLOSURES — 17 YEARS (2007–2024)" a={PURPLE}>
+      <div style={{fontFamily:"'Courier Prime'",fontSize:12,lineHeight:2}}>
+        Bank accounts disclosed: Congressional FCU (DC), Chevy Chase Bank (MD), Capital One (UT), Wells Fargo (OR), Morgan Stanley (NY)<br/>
+        Massachusetts bank accounts: <span style={{color:PURPLE,fontWeight:700}}>NONE — in 17 consecutive years of sworn filings</span><br/>
+        Spouse income every year: Global Health Institute, LLC — <span style={{color:GOLD}}>Chevy Chase, MD</span> — Spouse Salary — Over $1,000<br/>
+        Spouse medical office: 5530 Wisconsin Ave, Suite 1510, Chevy Chase MD (Doximity, MD Board of Physicians)<br/>
+        Spouse active medical licenses: Maryland, Massachusetts, California
+      </div>
+    </Card>
+    <Card t="FEC SCHEDULE A — CONTRIBUTIONS 1985–2025" a={BLUE}>
+      <div style={{fontFamily:"'Courier Prime'",fontSize:12,lineHeight:2}}>
+        Total raised: <span style={{color:GREEN}}>$50,384,948</span> from 145,138 contributions across 4 committee names<br/>
+        Massachusetts: $23,870,204 (<span style={{color:GREEN}}>47.4%</span>)<br/>
+        Outside Massachusetts: $26,514,744 (<span style={{color:RED}}>52.6%</span>)<br/>
+        Washington DC alone: $8,538,538 (<span style={{color:GOLD}}>16.9%</span>)
+      </div>
+    </Card>
+  </Sec>
+</div>}
+
+{/* ===== 3 PROPERTIES ===== */}
+{tab===1&&<div className="fade">
+  <Sec t="PROPERTY ASSESSMENT COMPARISON — 25 YEARS">
+    <div style={{height:280,marginBottom:8}}>
+      <ResponsiveContainer><ComposedChart data={combo} margin={{left:10,right:10,top:10}}>
+        <XAxis dataKey="y" tick={{fill:DTXT,fontSize:9}} interval={3} axisLine={{stroke:BORDER}}/>
+        <YAxis tick={{fill:DTXT,fontSize:9}} tickFormatter={n=>"$"+(n/1e6).toFixed(1)+"M"} axisLine={{stroke:BORDER}}/>
+        <Tooltip content={<Tip/>}/>
+        <Area type="monotone" dataKey="md" name="Chevy Chase MD" fill={RED+"18"} stroke={RED} strokeWidth={2.5}/>
+        <Area type="monotone" dataKey="ma" name="Townsend St MA" fill={PURPLE+"12"} stroke={PURPLE} strokeWidth={1.5} strokeDasharray="6 4"/>
+      </ComposedChart></ResponsiveContainer>
+    </div>
+    <div style={{display:"flex",gap:16,fontSize:10,fontFamily:"'Courier Prime'",color:DTXT,marginBottom:24}}>
+      <span><span style={{color:RED}}>━━</span> Chevy Chase MD</span>
+      <span><span style={{color:PURPLE}}>╌╌</span> Townsend St MA</span>
+      <span style={{marginLeft:"auto",color:GOLD}}>Charles St condo ($683K, purchased 2021) not shown</span>
+    </div>
+  </Sec>
+  <Sec t="ALL THREE PROPERTIES — ASSESSOR RECORDS" f={["OFFICIAL DATA",GOLD]}>
+    <div style={{background:CARD,border:"1px solid "+BORDER,overflow:"hidden"}}>
+      <div style={{display:"grid",gridTemplateColumns:"1.8fr 1.4fr 1.4fr 1.4fr",borderBottom:"2px solid "+BLUE+"30"}}>
+        {["SOURCE: ASSESSOR RECORDS","3403 ROLLING CT, MD","360A CHARLES ST, MA","7 TOWNSEND ST, MA"].map((h,i)=><div key={i} style={{padding:"10px 12px",fontSize:9,color:[DTXT,RED,GOLD,PURPLE][i],fontFamily:"'Courier Prime'",letterSpacing:1.5,fontWeight:700}}>{h}</div>)}
+      </div>
+      {[
+        ["Current Assessment","$1,654,600 → $1,940,800","$683,400","$492,200"],
+        ["Purchase Price","$790,000","$675,000","$150,000"],
+        ["Purchase Date","2/21/1991","2/26/2021","4/19/2001"],
+        ["Seller","Arms length sale","Hennigan, Bryan E","Markey John E (father)"],
+        ["Type","Brick house","Condo townhouse","Old style house"],
+        ["Year Built","1937","2007","1900"],
+        ["Total Size","4,316 sq ft (w/ 904 bsmt)","1,867 sq ft","1,134.5 sq ft"],
+        ["Bathrooms","4 full + 1 half (+ bsmt)","2 full + 1 half","1 full"],
+        ["Air Conditioning","Yes","100%","0% (none)"],
+        ["Garage","1 attached","1 basement","None"],
+        ["Heating","—","Gas forced air","Oil forced air"],
+        ["MC Tax Occupancy","NOT A PRINCIPAL (since 2002)","N/A — Massachusetts","N/A — Massachusetts"],
+        ["SDAT Principal Res","NO","—","—"],
+        ["SDAT Homestead","NO APPLICATION","—","—"],
+        ["Voter Registration","—","ACTIVE — 360 Charles St 2","—"],
+        ["Mailing Address","7 Townsend St, Malden","7 Townsend St, Malden","Self"],
+      ].map(([label,...vals],i)=>(
+        <div key={i} className="rh" style={{display:"grid",gridTemplateColumns:"1.8fr 1.4fr 1.4fr 1.4fr",borderBottom:"1px solid "+BG}}>
+          <div style={{padding:"7px 12px",fontSize:11.5,color:TXT,fontWeight:600,fontFamily:"'Barlow Condensed'"}}>{label}</div>
+          {vals.map((v,j)=><div key={j} style={{padding:"7px 12px",fontSize:10.5,color:v.includes("NOT A")||v.includes("NO ")||v.includes("0%")||v.includes("none")||v.includes("None")?RED:v.includes("ACTIVE")||v.includes("100%")?GREEN:TXT,fontFamily:"'Courier Prime'",fontWeight:v.includes("NOT")||v.includes("ACTIVE")?700:400}}>{v}</div>)}
+        </div>
+      ))}
+    </div>
+  </Sec>
+</div>}
+
+{/* ===== MC TAX ===== */}
+{tab===2&&<div className="fade">
+  <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:22}}>
+    <S l="YEARS ON FILE" v="27" sub="1999–2025" c={CYAN} w/>
+    <S l="PRINCIPAL RES" v="3 YRS" sub="1999–2001" c={GREEN} w/>
+    <S l="NOT PRINCIPAL" v="24 YRS" sub="2002–2025" c={RED} w/>
+    <S l="TOTAL TAX PAID" v={"$"+Math.round(totalTax/1000)+"K"} sub="With solid waste service" c={GOLD} w/>
+  </div>
+  <div style={{height:220,marginBottom:16}}>
+    <ResponsiveContainer><BarChart data={mcTax} margin={{left:5,right:5}}>
+      <XAxis dataKey="y" tick={{fill:DTXT,fontSize:8}} interval={3} axisLine={{stroke:BORDER}}/>
+      <YAxis tick={{fill:DTXT,fontSize:9}} tickFormatter={n=>"$"+(n/1000).toFixed(0)+"K"} axisLine={{stroke:BORDER}}/>
+      <Tooltip content={<Tip/>}/>
+      <Bar dataKey="t" name="Annual Tax" radius={[2,2,0,0]}>{mcTax.map((d,i)=><Cell key={i} fill={d.o?GREEN:RED}/>)}</Bar>
+    </BarChart></ResponsiveContainer>
+  </div>
+  <div style={{display:"flex",gap:16,fontSize:10,fontFamily:"'Courier Prime'",marginBottom:16}}>
+    <span style={{color:GREEN}}>■ Principal Residence (per MC tax bill)</span><span style={{color:RED}}>■ Not A Principal Residence (per MC tax bill)</span>
+  </div>
+  <div style={{background:CARD,border:"1px solid "+BORDER,maxHeight:380,overflowY:"auto"}}>
+    <div style={{display:"grid",gridTemplateColumns:"50px 1fr 1fr 1.4fr",borderBottom:"2px solid "+BLUE+"25",position:"sticky",top:0,background:CARD,zIndex:1}}>
+      {["YEAR","ASSESSED","TAX","OCCUPANCY (VERBATIM)"].map(h=><div key={h} style={{padding:"8px 10px",fontSize:8,color:DTXT,letterSpacing:2,fontFamily:"'Courier Prime'"}}>{h}</div>)}
+    </div>
+    {mcTax.map((d,i)=>(
+      <div key={i} className="rh" style={{display:"grid",gridTemplateColumns:"50px 1fr 1fr 1.4fr",borderBottom:"1px solid "+BG,background:d.o?GREEN+"06":"transparent"}}>
+        <div style={{padding:"5px 10px",fontSize:12,color:d.o?GREEN:TXT,fontWeight:700,fontFamily:"'Oswald'"}}>{d.y}</div>
+        <div style={{padding:"5px 10px",fontSize:10,color:TXT,fontFamily:"'Courier Prime'"}}>${d.a.toLocaleString()}</div>
+        <div style={{padding:"5px 10px",fontSize:10,color:TXT,fontFamily:"'Courier Prime'"}}>${d.t.toLocaleString()}</div>
+        <div style={{padding:"5px 10px",fontSize:10,color:d.o?GREEN:RED,fontFamily:"'Courier Prime'",fontWeight:700}}>{d.o?"PRINCIPAL RESIDENCE":"NOT A PRINCIPAL RESIDENCE"}</div>
+      </div>
+    ))}
+  </div>
+  <div style={{marginTop:12,fontSize:11,color:DTXT,fontFamily:"'Courier Prime'",lineHeight:1.8}}>
+    Source: Montgomery County MD Real Property Consolidated Tax Bills, retrieved 3/18/2026.<br/>
+    "Occupancy" is a designated field on each annual bill. Text shown is verbatim from the documents.
+  </div>
+</div>}
+
+{/* ===== MORTGAGE DOC ===== */}
+{tab===3&&<div className="fade">
+  <Sec t="RECORDED MORTGAGE — MIDDLESEX SOUTH REGISTRY OF DEEDS" f={["BK 77078 PG 323",CYAN]}>
+    <Card t="RECORDING INFORMATION" a={CYAN}>
+      <div style={{fontFamily:"'Courier Prime'",fontSize:12,lineHeight:2}}>
+        Document Number: 43789 • Type: MTG (Mortgage)<br/>
+        Recorded: February 26, 2021 at 2:25:59 PM<br/>
+        Book and Page: 77078 / 323 • Pages: 23<br/>
+        Recording Fee: $205.00
+      </div>
+    </Card>
+    <Card t="PARTIES AND TERMS" a={GOLD}>
+      <div style={{fontFamily:"'Courier Prime'",fontSize:12,lineHeight:2}}>
+        Borrowers: <span style={{color:LTXT,fontWeight:700}}>Susan J Blumenthal and Edward J Markey</span>, Husband and Wife, tenants by the entirety<br/>
+        Lender: Members Mortgage Company, Inc., 90 Maple Street, Stoneham MA 02180<br/>
+        Loan Originator: Joseph N Zampitella (License #684111)<br/>
+        Property: <span style={{color:GOLD}}>360 Charles Street, Unit 2, Malden, Massachusetts 02148</span><br/>
+        Loan Amount: <span style={{color:GREEN}}>$540,000.00</span><br/>
+        Maturity Date: March 1, 2051 (30-year term)<br/>
+        Instrument: Fannie Mae/Freddie Mac UNIFORM INSTRUMENT Form 3022
+      </div>
+    </Card>
+    <Card t="RIDERS (FROM PAGE 3 — CHECKBOX SECTION)" a={BLUE}>
+      <div style={{fontFamily:"'Courier Prime'",fontSize:12,lineHeight:2.2}}>
+        [ ] Adjustable Rate Rider<br/>
+        <span style={{color:GREEN,fontWeight:700}}>[x] Condominium Rider</span><br/>
+        [ ] Second Home Rider — <span style={{color:DTXT}}>NOT CHECKED</span><br/>
+        [ ] Balloon Rider<br/>
+        [ ] Planned Unit Development Rider<br/>
+        [ ] VA Rider<br/>
+        [ ] 1-4 Family Rider<br/>
+        [ ] Biweekly Payment Rider
+      </div>
+    </Card>
+    <Card t="SECTION 6 — OCCUPANCY (VERBATIM FROM DOCUMENT)" a={RED}>
+      <div style={{fontFamily:"'Courier Prime'",fontSize:13,lineHeight:2,color:LTXT}}>
+        "6. Occupancy. <span style={{color:RED}}>Borrower shall occupy, establish, and use the Property as Borrower's principal residence within 60 days after the execution of this Security Instrument</span> and shall continue to occupy the Property as Borrower's principal residence for at least one year after the date of occupancy, unless Lender otherwise agrees in writing..."
+      </div>
+    </Card>
+    <Card t="SECTION 8 — BORROWER'S LOAN APPLICATION (VERBATIM)" a={PURPLE}>
+      <div style={{fontFamily:"'Courier Prime'",fontSize:13,lineHeight:2,color:LTXT}}>
+        "8. Borrower's Loan Application. Borrower shall be in default if, during the Loan application process, Borrower or any persons or entities acting at the direction of Borrower or with Borrower's knowledge..."<br/><br/>
+        This section references that representations made during the application — including <span style={{color:PURPLE}}>"representations concerning Borrower's occupancy of the Property as Borrower's principal residence"</span> — form the basis of the loan agreement.
+      </div>
+    </Card>
+    <div style={{fontSize:11,color:DTXT,fontFamily:"'Courier Prime'",lineHeight:1.8,marginTop:12}}>
+      Source: Middlesex South Registry of Deeds, Document #43789, Book 77078, Pages 323–345.<br/>
+      Full 23-page document available at masslandrecords.com or in person at 208 Cambridge St, Cambridge MA.
+    </div>
+  </Sec>
+</div>}
+
+{/* ===== FEC ===== */}
+{tab===4&&<div className="fade">
+  <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:22}}>
+    <S l="TOTAL RAISED" v="$50.4M" sub="145,138 contributions" c={GREEN} w/>
+    <S l="MASSACHUSETTS" v="47.4%" sub="$23,870,204" c={BLUE} w/>
+    <S l="OUT OF STATE" v="52.6%" sub="$26,514,744" c={RED} w/>
+    <S l="DC ALONE" v="$8.5M" sub="16.9% of all contributions" c={GOLD} w/>
+  </div>
+  <Sec t="CONTRIBUTIONS BY STATE">
+    <div style={{height:210,marginBottom:20}}>
+      <ResponsiveContainer><BarChart data={stD} layout="vertical" margin={{left:5,right:10}}>
+        <XAxis type="number" tick={{fill:DTXT,fontSize:9}} axisLine={{stroke:BORDER}} unit="M"/>
+        <YAxis type="category" dataKey="s" tick={{fill:LTXT,fontSize:13,fontFamily:"'Oswald'",fontWeight:700}} width={28} axisLine={{stroke:BORDER}}/>
+        <Tooltip content={<Tip/>}/>
+        <Bar dataKey="v" name="$Millions" radius={[0,3,3,0]}>{stD.map((s,i)=><Cell key={i} fill={s.s==="MA"?GREEN:s.s==="DC"?RED:s.s==="MD"?GOLD:BLUE}/>)}</Bar>
+      </BarChart></ResponsiveContainer>
+    </div>
+    <div style={{fontSize:11,color:DTXT,fontFamily:"'Courier Prime'"}}>Source: FEC Schedule A bulk data, all committee IDs associated with Edward Markey, 1985–2025.</div>
+  </Sec>
+  <Sec t="TOP EMPLOYER CLUSTERS BY CONTRIBUTION TOTAL" f={["FEC SCHEDULE A",PURPLE]}>
+    <div style={{background:CARD,border:"1px solid "+BORDER}}>
+      {[["WILMERHALE","$205,260","238 donors",RED],["MINTZ LEVIN","$98,260","131 donors",GOLD],["GOOGLE","$83,291","128 donors",BLUE],["HARVARD UNIVERSITY","$83,033","440 donors",CYAN],["DLA PIPER","$65,900","58 donors",PURPLE],["CASSIDY & ASSOCIATES","$55,900","77 donors",GREEN],["COVINGTON & BURLING","$55,600","88 donors",BLUE]].map(([n,t,d,c],i)=>(
+        <div key={i} className="rh" style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",borderBottom:"1px solid "+BG,padding:"8px 14px"}}>
+          <div style={{fontSize:13,color:c,fontFamily:"'Oswald'",fontWeight:600}}>{n}</div>
+          <div style={{fontSize:11,color:TXT,fontFamily:"'Courier Prime'"}}>{t}</div>
+          <div style={{fontSize:10,color:DTXT,fontFamily:"'Courier Prime'"}}>{d}</div>
+        </div>
+      ))}
+    </div>
+  </Sec>
+</div>}
+
+{/* ===== DISCLOSURES ===== */}
+{tab===5&&<div className="fade">
+  <Sec t="MORTGAGE LIABILITIES — SWORN SENATE FINANCIAL DISCLOSURES" f={["PART VII",BLUE]}>
+    <div style={{background:CARD,border:"1px solid "+BORDER}}>
+      <div style={{display:"grid",gridTemplateColumns:"45px 1.4fr 0.9fr 1.4fr 0.9fr",borderBottom:"2px solid "+BLUE+"25"}}>
+        {["YEAR","MA CREDITOR","BALANCE","MD CREDITOR","BALANCE"].map(h=><div key={h} style={{padding:"7px 8px",fontSize:8,color:DTXT,letterSpacing:1.5,fontFamily:"'Courier Prime'"}}>{h}</div>)}
+      </div>
+      {[["2011","Members Mtg, Malden","$100K–250K","Chase Home, Chevy Chase","$250K–500K"],["2012","Members Mtg, Malden","$100K–250K","Chase Home, Chevy Chase","$250K–500K"],["2019","Members Mtg, Woburn","$15K–50K","Chase, Columbus OH (servicer)","$15K–50K"],["2021","Members Mtg, Stoneham","$10K–15K","Select Portfolio, SLC (servicer)","$15K–50K"],["2021","360 Charles purchase","$250K–500K","—","(disappearing)"],["2024","Members Mtg x2","$10K + $250K–500K","Not listed","—"]].map((r,i)=>(
+        <div key={i} className="rh" style={{display:"grid",gridTemplateColumns:"45px 1.4fr 0.9fr 1.4fr 0.9fr",borderBottom:"1px solid "+BG}}>
+          {r.map((c,j)=><div key={j} style={{padding:"7px 8px",fontSize:10,color:j===0?CYAN:c.includes("Not listed")||c.includes("disappearing")?GOLD:TXT,fontFamily:"'Courier Prime'",fontWeight:j===0?700:400}}>{c}</div>)}
+        </div>
+      ))}
+    </div>
+  </Sec>
+  <Sec t="BANK ACCOUNTS — 17 YEARS OF SWORN DISCLOSURES" f={["PART IIIB",PURPLE]}>
+    <div style={{background:CARD,border:"1px solid "+BORDER}}>
+      {[["Congressional FCU","Washington, DC","2013–2024",BLUE],["Chevy Chase Bank","Chevy Chase, MD","2008–2009",GOLD],["Capital One (formerly CCB)","Salt Lake City, UT","2010–2024",CYAN],["Wells Fargo","Portland, OR","2009–2024",GREEN],["Morgan Stanley IRA","New York, NY","2019–2024",PURPLE],["Massachusetts bank accounts","—","None disclosed in any filing year",RED]].map(([n,l,y,c],i)=>(
+        <div key={i} className="rh" style={{display:"grid",gridTemplateColumns:"2fr 1.5fr 1.2fr",borderBottom:"1px solid "+BG,background:i===5?RED+"06":"transparent"}}>
+          <div style={{padding:"7px 14px",fontSize:12,color:c,fontFamily:"'Courier Prime'",fontWeight:i===5?700:400}}>{n}</div>
+          <div style={{padding:"7px 14px",fontSize:10,color:TXT,fontFamily:"'Courier Prime'"}}>{l}</div>
+          <div style={{padding:"7px 14px",fontSize:10,color:i===5?RED:DTXT,fontFamily:"'Courier Prime'",fontWeight:i===5?700:400}}>{y}</div>
+        </div>
+      ))}
+    </div>
+  </Sec>
+  <Sec t="SPOUSE EARNED INCOME — PART II (EVERY YEAR 2007–2024)" f={["SWORN",GOLD]}>
+    <Card a={GOLD}>
+      <div style={{fontFamily:"'Courier Prime'",fontSize:12,lineHeight:2}}>
+        Listed on every annual filing: <span style={{color:GOLD}}>Global Health Institute, LLC</span> — Address: <span style={{color:CYAN}}>Chevy Chase, MD</span><br/>
+        Type: Spouse Salary • Amount: Over $1,000<br/>
+        Description varies: "including medical services" / "including Private Practice of Medicine"<br/>
+        Physician profile (Doximity): Dr. Susan Blumenthal, MD — Psychiatrist — <span style={{color:GREEN}}>Chevy Chase, Maryland</span><br/>
+        Office: 5530 Wisconsin Ave, Suite 1510, Chevy Chase MD 20815<br/>
+        Active licenses: Maryland, Massachusetts, California<br/>
+        Clinical Professor: Georgetown University School of Medicine (Washington, DC)
+      </div>
+    </Card>
+  </Sec>
+</div>}
+
+{/* ===== TIMELINE ===== */}
+{tab===6&&<div className="fade">
+  <Sec t="CHRONOLOGICAL RECORD">
+    <div style={{position:"relative",paddingLeft:60}}>
+      <div style={{position:"absolute",left:44,top:0,bottom:0,width:2,background:"linear-gradient(180deg,"+BLUE+","+RED+" 20%,"+GOLD+" 50%,"+PURPLE+" 75%,"+BORDER+")"}}/>
+      {[
+        {y:"1976",e:"Elected to U.S. House, MA-07. Residence listed as parents' house at 7 Townsend St, Malden. Markey does not own property in Massachusetts.",c:BLUE},
+        {y:"1991",e:"Purchases 3403 Rolling Ct, Chevy Chase MD for $790,000 (MD SDAT: arms length improved sale). Brick, 3,412 SF + 904 SF basement, 6 bathrooms, attached garage. Marries Susan Blumenthal.",c:RED,t:"CHEVY CHASE PURCHASE"},
+        {y:"1999",e:"Montgomery County tax bill: assessment $254,600. Occupancy: PRINCIPAL RESIDENCE. Mailing address: 3403 Rolling Ct, Chevy Chase MD 20815.",c:GREEN,t:"MC TAX: PRINCIPAL"},
+        {y:"2001",e:"MC tax bill: PRINCIPAL RESIDENCE. Father John E. Markey dies. Edward Markey purchases 7 Townsend St, Malden for $150,000 from father's estate. First property ownership in Massachusetts.",c:GOLD,t:"TOWNSEND PURCHASE"},
+        {y:"2002",e:"MC tax bill occupancy changes to: NOT A PRINCIPAL RESIDENCE. Mailing address changes to: 7 Townsend St, Malden MA 02148. This status continues for 24 consecutive years through 2025.",c:RED,t:"MC TAX: NOT PRINCIPAL"},
+        {y:"2007",e:"Earliest available Senate financial disclosure. Reports: spouse salary from Global Health Institute LLC, Chevy Chase MD. No Massachusetts bank accounts disclosed.",c:CYAN,t:"FIRST DISCLOSURE"},
+        {y:"2011",e:"Financial disclosure Part VII (Liabilities): MA mortgage $100,001–$250,000 (Members Mortgage, Malden). MD mortgage $250,001–$500,000 (Chase Home Finance, Chevy Chase).",c:PURPLE,t:"DUAL MORTGAGES"},
+        {y:"2021",e:"Deed recorded: 360A Charles St, Malden — $675,000 purchase from Hennigan, Bryan E. Mortgage recorded: $540,000, Members Mortgage, Bk 77078/Pg 323. Section 6: 'Borrower shall occupy as principal residence.' Second Home Rider: not checked.",c:GOLD,t:"CHARLES ST PURCHASE"},
+        {y:"2021",e:"Voter registration address changes to 360 Charles St 2, Malden MA 02148. Mailing address on Charles St assessor record: 7 Townsend St.",c:GREEN,t:"VOTER REG UPDATE"},
+        {y:"2024",e:"Senate disclosure: two MA mortgages listed (Members Mortgage). MD mortgage no longer appears in filing.",c:PURPLE,t:"MD MORTGAGE ABSENT"},
+        {y:"2025",e:"MC SDAT: assessment $1,654,600, phasing to $1,940,800. Principal Residence: NO. Homestead Application: NO APPLICATION. Annual tax: $19,866. Includes solid waste charge ($671) and water quality protection charge ($147). Total MC taxes paid 1999–2025: $"+Math.round(totalTax/1000)+"K.",c:RED,t:"CURRENT SDAT"},
+      ].map((item,i)=>(
+        <div key={i} style={{display:"flex",gap:14,marginBottom:20,position:"relative"}}>
+          <div style={{position:"absolute",left:-16,top:4,width:12,height:12,borderRadius:6,background:item.t?item.c:BORDER,border:"2px solid "+item.c,boxShadow:item.t?"0 0 12px "+item.c+"50":"none"}}/>
+          <div>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
+              <span style={{fontSize:14,fontWeight:700,color:item.c,fontFamily:"'Oswald'",letterSpacing:2}}>{item.y}</span>
+              {item.t&&<F c={item.c}>{item.t}</F>}
+            </div>
+            <div style={{fontSize:13,color:TXT,fontFamily:"'Barlow Condensed'",lineHeight:1.65}}>{item.e}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </Sec>
+</div>}
+
+        {/* FOOTER */}
+        <div style={{marginTop:36,paddingTop:14,borderTop:"1px solid "+BORDER,textAlign:"center"}}>
+          <div style={{fontSize:9,color:DTXT,fontFamily:"'Courier Prime'",letterSpacing:2,lineHeight:2.4}}>
+            ALL DATA FROM OFFICIAL GOVERNMENT RECORDS AND SWORN FILINGS<br/>
+            MC TAX BILLS (27) • MD SDAT • MALDEN ASSESSOR • MIDDLESEX SOUTH REGISTRY OF DEEDS<br/>
+            SENATE FINANCIAL DISCLOSURES (17 YRS) • FEC SCHEDULE A/B • MA SECRETARY OF STATE<br/>
+            MD BOARD OF PHYSICIANS • DOXIMITY PHYSICIAN PROFILE<br/>
+            GITHUB.COM/DUNCANBURNS2013-DOT/ED-FROM-MARYLAND
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
